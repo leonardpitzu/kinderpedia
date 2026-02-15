@@ -1,0 +1,13 @@
+{
+  "domain": "kinderpedia",
+  "name": "Kinderpedia",
+  "version": "1.0.0",
+  "config_flow": true,
+  "documentation": "https://mykp.kinderpedia.co/",
+  "requirements": [],
+  "dependencies": [],
+  "codeowners": [
+    "@leonardpitzu"
+  ],
+  "iot_class": "cloud_polling"
+}

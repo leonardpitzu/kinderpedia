@@ -1,0 +1,23 @@
+{
+  "title": "Kinderpedia",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Kinderpedia",
+        "description": "Enter your Kinderpedia credentials. All children will be discovered automatically.",
+        "data": {
+          "email": "Email",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid email or password",
+      "no_children_found": "No active children found on this account",
+      "cannot_connect": "Unable to connect to Kinderpedia"
+    },
+    "abort": {
+      "already_configured": "This Kinderpedia account is already configured"
+    }
+  }
+}
