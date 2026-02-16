@@ -1,5 +1,7 @@
 """Shared fixtures for Kinderpedia tests."""
 
+import threading
+
 import pytest
 from unittest.mock import AsyncMock, patch
 
@@ -9,11 +11,21 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.kinderpedia.const import DOMAIN
 
+# Monkey-patch threading.enumerate so the test framework's thread-leak check
+# ignores the _run_safe_shutdown_loop daemon thread.  This is fixed upstream in
+# pytest-homeassistant-custom-component >= 0.13.315.
+_original_enumerate = threading.enumerate
 
-@pytest.fixture(autouse=True)
-def expected_lingering_threads() -> bool:
-    """Mark lingering daemon threads as expected to avoid teardown errors."""
-    return True
+
+def _patched_enumerate():
+    return [
+        t
+        for t in _original_enumerate()
+        if "_run_safe_shutdown_loop" not in t.name
+    ]
+
+
+threading.enumerate = _patched_enumerate
 
 MOCK_EMAIL = "test@example.com"
 MOCK_PASSWORD = "password123"
