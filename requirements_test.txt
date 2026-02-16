@@ -1,4 +1,3 @@
 pytest==9.0.2
-pytest-asyncio==1.3.0
 pytest-homeassistant-custom-component==0.13.205
 ruff==0.15.1
