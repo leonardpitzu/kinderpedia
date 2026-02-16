@@ -1,7 +1,5 @@
 """Shared fixtures for Kinderpedia tests."""
 
-import threading
-
 import pytest
 from unittest.mock import AsyncMock, patch
 
