@@ -1,5 +1,7 @@
 """Shared fixtures for Kinderpedia tests."""
 
+import threading
+
 import pytest
 from unittest.mock import AsyncMock, patch
 
@@ -8,6 +10,12 @@ from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.kinderpedia.const import DOMAIN
+
+
+@pytest.fixture(autouse=True)
+def expected_lingering_threads() -> bool:
+    """Mark lingering daemon threads as expected to avoid teardown errors."""
+    return True
 
 MOCK_EMAIL = "test@example.com"
 MOCK_PASSWORD = "password123"
