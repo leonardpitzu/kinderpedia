@@ -53,7 +53,7 @@ MOCK_TIMELINE_RAW = {
                 "2026-02-09": {
                     "data": [
                         {"id": "checkin", "subtitle": "08:15 - 16:30"},
-                        {"id": "nap", "subtitle": "1 h and 30 min"},
+                        {"id": "nap", "subtitle": "12:39 - 14:33, 1 h and 30 min"},
                         {
                             "id": "food_1",
                             "details": {

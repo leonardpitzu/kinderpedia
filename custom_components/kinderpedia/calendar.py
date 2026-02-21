@@ -1,15 +1,19 @@
 """Calendar platform for Kinderpedia."""
 
 import logging
-from datetime import date, datetime, timedelta
+import re
+from datetime import date, datetime, timedelta, timezone
 
 from homeassistant.components.calendar import CalendarEntity, CalendarEvent
 from homeassistant.core import callback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
+
+_NAP_TIME_RE = re.compile(r"(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})")
 
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
@@ -75,8 +79,15 @@ class KinderpediaCalendar(CoordinatorEntity, CalendarEntity):
         """Return the current/next event (today)."""
         events = self._build_events()
         today = date.today()
+
+        def _to_date(dt_or_d: date | datetime) -> date:
+            return dt_or_d.date() if isinstance(dt_or_d, datetime) else dt_or_d
+
         for ev in events:
-            if ev.start <= today <= ev.end - timedelta(days=1):
+            ev_start = _to_date(ev.start)
+            ev_end = _to_date(ev.end)
+            # All-day events have exclusive end; timed events end same day
+            if ev_start <= today <= ev_end:
                 return ev
         return None
 
@@ -90,10 +101,14 @@ class KinderpediaCalendar(CoordinatorEntity, CalendarEntity):
         events = self._build_events()
         start_d = start_date.date() if isinstance(start_date, datetime) else start_date
         end_d = end_date.date() if isinstance(end_date, datetime) else end_date
+
+        def _event_date(dt_or_d: date | datetime) -> date:
+            return dt_or_d.date() if isinstance(dt_or_d, datetime) else dt_or_d
+
         return [
             ev
             for ev in events
-            if ev.start < end_d and ev.end > start_d
+            if _event_date(ev.start) < end_d and _event_date(ev.end) >= start_d
         ]
 
     # ------------------------------------------------------------------
@@ -120,16 +135,17 @@ class KinderpediaCalendar(CoordinatorEntity, CalendarEntity):
             summary_parts: list[str] = []
             description_parts: list[str] = []
 
-            # Check-in / check-out
+            # Check-in / check-out  (shown in event title only)
             checkin = day_info.get("checkin", "unknown")
             if checkin and checkin != "unknown":
                 summary_parts.append(f"School {checkin}")
-                description_parts.append(f"Check-in: {checkin}")
 
-            # Nap
+            # Nap → separate timed event
             nap = day_info.get("nap", "unknown")
             if nap and nap != "unknown":
-                description_parts.append(f"Nap: {nap}")
+                nap_event = self._build_nap_event(event_date, nap)
+                if nap_event:
+                    events.append(nap_event)
 
             # Meals
             for meal in ("breakfast", "lunch", "snack"):
@@ -156,3 +172,30 @@ class KinderpediaCalendar(CoordinatorEntity, CalendarEntity):
             )
 
         return events
+
+    @staticmethod
+    def _build_nap_event(
+        event_date: date, nap_text: str
+    ) -> CalendarEvent | None:
+        """Create a timed nap event when start/end times are available."""
+        match = _NAP_TIME_RE.search(nap_text)
+        if not match:
+            return None
+
+        try:
+            start_time = datetime.strptime(match.group(1), "%H:%M").time()
+            end_time = datetime.strptime(match.group(2), "%H:%M").time()
+        except ValueError:
+            return None
+
+        nap_start = datetime.combine(event_date, start_time, tzinfo=dt_util.DEFAULT_TIME_ZONE)
+        nap_end = datetime.combine(event_date, end_time, tzinfo=dt_util.DEFAULT_TIME_ZONE)
+
+        if nap_end <= nap_start:
+            return None
+
+        return CalendarEvent(
+            summary="Nap",
+            start=nap_start,
+            end=nap_end,
+        )

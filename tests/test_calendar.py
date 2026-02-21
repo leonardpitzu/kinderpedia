@@ -1,9 +1,10 @@
 """Tests for Kinderpedia calendar platform."""
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 from unittest.mock import MagicMock
 
 from homeassistant.core import HomeAssistant
+from homeassistant.util import dt as dt_util
 
 from custom_components.kinderpedia.coordinator import _parse_timeline
 from custom_components.kinderpedia.calendar import KinderpediaCalendar
@@ -48,6 +49,16 @@ async def test_calendar_builds_events(hass: HomeAssistant):
     has_checkin_event = any("08:15" in (e.summary or "") for e in events)
     assert has_checkin_event
 
+    # Monday should also produce a timed nap event
+    nap_events = [e for e in events if e.summary == "Nap"]
+    assert len(nap_events) == 1
+    nap = nap_events[0]
+    assert isinstance(nap.start, datetime)
+    assert isinstance(nap.end, datetime)
+    assert nap.start.hour == 12 and nap.start.minute == 39
+    assert nap.end.hour == 14 and nap.end.minute == 33
+    assert nap.start.tzinfo is not None
+
 
 async def test_calendar_event_property_returns_today(hass: HomeAssistant):
     """The .event property returns an event for today if one exists."""
@@ -83,9 +94,11 @@ async def test_calendar_async_get_events_filters_range(hass: HomeAssistant):
     end = datetime(2026, 2, 10)
 
     events = await cal.async_get_events(hass, start, end)
-    # Should only include the Monday event (2026-02-09)
-    assert all(e.start >= date(2026, 2, 9) for e in events)
-    assert all(e.start < date(2026, 2, 10) for e in events)
+    # Should only include Monday events (2026-02-09): school + nap
+    for e in events:
+        ev_date = e.start.date() if isinstance(e.start, datetime) else e.start
+        assert ev_date >= date(2026, 2, 9)
+        assert ev_date < date(2026, 2, 10)
 
 
 async def test_calendar_async_get_events_full_week(hass: HomeAssistant):
@@ -100,8 +113,8 @@ async def test_calendar_async_get_events_full_week(hass: HomeAssistant):
 
     events = await cal.async_get_events(hass, start, end)
     # Monday has real data, other days have empty data arrays
-    # Only Monday should produce events (the only one with checkin/food)
-    assert len(events) >= 1
+    # Monday should produce a school event + a nap event
+    assert len(events) >= 2
 
 
 async def test_calendar_no_data(hass: HomeAssistant):
@@ -116,14 +129,14 @@ async def test_calendar_no_data(hass: HomeAssistant):
 
 
 async def test_calendar_event_description_contains_meals(hass: HomeAssistant):
-    """Event description should mention meals."""
+    """Event description should mention meals but not checkin/nap."""
     coordinator = MagicMock()
     coordinator.data = _make_coordinator_data()
 
     cal = _make_calendar(coordinator)
     events = cal._build_events()
 
-    monday_events = [e for e in events if e.start == date(2026, 2, 9)]
+    monday_events = [e for e in events if isinstance(e.start, date) and not isinstance(e.start, datetime) and e.start == date(2026, 2, 9)]
     assert len(monday_events) == 1
 
     desc = monday_events[0].description or ""
@@ -131,3 +144,46 @@ async def test_calendar_event_description_contains_meals(hass: HomeAssistant):
     assert "Lunch" in desc
     assert "Cereal" in desc
     assert "Chicken soup" in desc
+
+    # Check-in and Nap must NOT appear in description
+    assert "Check-in" not in desc
+    assert "Nap" not in desc
+
+
+async def test_nap_event_not_created_without_times(hass: HomeAssistant):
+    """When nap subtitle has only duration (no times), no nap event is created."""
+    coordinator = MagicMock()
+    data = _make_coordinator_data()
+    # Override nap to duration-only format
+    data["children"]["111_222"]["days"]["monday"]["nap"] = "1 h and 30 min"
+    coordinator.data = data
+
+    cal = _make_calendar(coordinator)
+    events = cal._build_events()
+
+    nap_events = [e for e in events if e.summary == "Nap"]
+    assert len(nap_events) == 0
+
+
+async def test_nap_event_not_created_with_partial_times(hass: HomeAssistant):
+    """When nap has a start time but no end time (API glitch), no nap event."""
+    coordinator = MagicMock()
+    data = _make_coordinator_data()
+    days = data["children"]["111_222"]["days"]["monday"]
+
+    partial_values = [
+        "12:39 - ",         # end time missing entirely
+        "12:39 -",          # trailing dash, no end
+        "12:39",            # bare start, no separator
+        "12:39 - , 1 h",   # comma where end time should be
+        " - 14:33",         # start time missing
+    ]
+    for nap_text in partial_values:
+        days["nap"] = nap_text
+        coordinator.data = data
+
+        cal = _make_calendar(coordinator)
+        events = cal._build_events()
+
+        nap_events = [e for e in events if e.summary == "Nap"]
+        assert len(nap_events) == 0, f"Nap event should not be created for: {nap_text!r}"
