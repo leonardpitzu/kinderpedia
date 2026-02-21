@@ -43,6 +43,9 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
             new_sensors.append(KinderpediaNapWeekSensor(
                 coordinator, child_id, kg_id, device_name, first_name
             ))
+            new_sensors.append(KinderpediaNewsfeedSensor(
+                coordinator, child_id, kg_id, device_name, first_name
+            ))
 
             for weekday in child_data.get("days", {}):
                 new_sensors.append(KinderpediaDaySensor(
@@ -186,3 +189,70 @@ class KinderpediaNapWeekSensor(_KinderpediaWeekSensorBase):
 
     def __init__(self, coordinator, child_id, kg_id, device_name, first_name):
         super().__init__(coordinator, child_id, kg_id, device_name, first_name, "nap_week")
+
+
+class KinderpediaNewsfeedSensor(CoordinatorEntity, SensorEntity):
+    """Sensor showing the latest newsfeed item for a child."""
+
+    def __init__(self, coordinator, child_id, kg_id, device_name, first_name):
+        super().__init__(coordinator)
+        self._key = f"{child_id}_{kg_id}"
+        self._attr_unique_id = f"{DOMAIN}_newsfeed_{child_id}_{kg_id}"
+        self._attr_name = f"{first_name.lower()} newsfeed"
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, f"{child_id}_{kg_id}")},
+            "name": device_name,
+            "manufacturer": "Kinderpedia",
+        }
+
+    def _get_feed(self):
+        data = self.coordinator.data or {}
+        child_data = data.get("children", {}).get(self._key, {})
+        return child_data.get("newsfeed", [])
+
+    @property
+    def native_value(self):
+        feed = self._get_feed()
+        if feed:
+            return feed[0].get("title", "")[:255]
+        return None
+
+    @property
+    def extra_state_attributes(self):
+        feed = self._get_feed()
+        data = self.coordinator.data or {}
+        attrs = {
+            "last_updated": data.get("last_updated"),
+            "item_count": len(feed),
+        }
+        if feed:
+            latest = feed[0]
+            attrs["latest_id"] = latest.get("id")
+            attrs["latest_type"] = latest.get("type")
+            attrs["latest_date"] = latest.get("date_friendly")
+            attrs["latest_author"] = latest.get("author")
+            attrs["latest_description"] = (latest.get("description") or "")[:500]
+            attrs["latest_likes"] = latest.get("likes", 0)
+            attrs["latest_comments"] = latest.get("comments", 0)
+            attrs["latest_image_count"] = latest.get("image_count", 0)
+            attrs["latest_image_url"] = latest.get("first_image_url")
+            attrs["latest_video_url"] = latest.get("video_url")
+            attrs["latest_group"] = latest.get("group")
+
+            if latest.get("latest_comment"):
+                attrs["latest_comment_author"] = latest["latest_comment"].get("author")
+                attrs["latest_comment_text"] = latest["latest_comment"].get("text")
+
+            # Summary of recent items (up to 10)
+            attrs["recent_items"] = [
+                {
+                    "id": item.get("id"),
+                    "type": item.get("type"),
+                    "title": item.get("title", "")[:100],
+                    "date": item.get("date_friendly"),
+                    "author": item.get("author"),
+                    "likes": item.get("likes", 0),
+                }
+                for item in feed[:10]
+            ]
+        return attrs

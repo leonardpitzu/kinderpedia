@@ -9,7 +9,7 @@ from custom_components.kinderpedia.api import (
     KinderpediaAuthError,
     KinderpediaConnectionError,
 )
-from tests.conftest import MOCK_LOGIN_RESPONSE, MOCK_CORE_RESPONSE, MOCK_TIMELINE_RAW
+from tests.conftest import MOCK_LOGIN_RESPONSE, MOCK_CORE_RESPONSE, MOCK_TIMELINE_RAW, MOCK_NEWSFEED_RAW
 
 
 def _make_response(status, json_data):
@@ -172,6 +172,39 @@ class TestFetchTimeline:
 
         with pytest.raises(KinderpediaConnectionError):
             await api.fetch_timeline(111, 222)
+
+
+class TestFetchNewsfeed:
+    """Tests for the fetch_newsfeed method."""
+
+    @pytest.mark.asyncio
+    async def test_fetch_newsfeed_success(self):
+        hass = MagicMock()
+        api, session = _make_api(hass)
+
+        login_resp = _make_response(200, MOCK_LOGIN_RESPONSE)
+        feed_resp = _make_response(200, MOCK_NEWSFEED_RAW)
+
+        session.post = MagicMock(return_value=_async_ctx(login_resp))
+        session.get = MagicMock(return_value=_async_ctx(feed_resp))
+
+        result = await api.fetch_newsfeed(111, 222)
+        assert "result" in result
+        assert "feed" in result["result"]
+
+    @pytest.mark.asyncio
+    async def test_fetch_newsfeed_http_error(self):
+        hass = MagicMock()
+        api, session = _make_api(hass)
+
+        login_resp = _make_response(200, MOCK_LOGIN_RESPONSE)
+        feed_resp = _make_response(500, {})
+
+        session.post = MagicMock(return_value=_async_ctx(login_resp))
+        session.get = MagicMock(return_value=_async_ctx(feed_resp))
+
+        with pytest.raises(KinderpediaConnectionError):
+            await api.fetch_newsfeed(111, 222)
 
 
 # --- Helpers for async context managers ---

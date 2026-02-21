@@ -3,6 +3,10 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+# Example API response files
+newsfeed
+dailytimeline
+
 # C extensions
 *.so
 

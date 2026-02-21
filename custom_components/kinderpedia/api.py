@@ -2,7 +2,7 @@ import logging
 from datetime import datetime
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.exceptions import HomeAssistantError
-from .const import LOGIN_URL, CORE_URL, DATA_URL, API_KEY
+from .const import LOGIN_URL, CORE_URL, DATA_URL, NEWSFEED_URL, API_KEY
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -130,3 +130,25 @@ class KinderpediaAPI:
             raise
         except Exception as e:
             raise KinderpediaConnectionError(f"Failed to fetch timeline: {e}") from e
+
+    async def fetch_newsfeed(self, child_id, kindergarten_id):
+        await self.login()
+        headers = {
+            "x-child-id": str(child_id),
+            "x-kindergarten-id": str(kindergarten_id),
+            "x-requested-with": "XMLHttpRequest",
+            "x-api-key": API_KEY,
+            "cookie": f"JWToken={self.token}",
+        }
+
+        _LOGGER.debug("Fetching newsfeed from %s", NEWSFEED_URL)
+
+        try:
+            async with self.session.get(NEWSFEED_URL, headers=headers) as resp:
+                if resp.status != 200:
+                    raise KinderpediaConnectionError(f"Newsfeed fetch failed: HTTP {resp.status}")
+                return await resp.json()
+        except KinderpediaConnectionError:
+            raise
+        except Exception as e:
+            raise KinderpediaConnectionError(f"Failed to fetch newsfeed: {e}") from e

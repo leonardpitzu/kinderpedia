@@ -117,6 +117,87 @@ def _parse_timeline(json_data):
     return parsed
 
 
+def _parse_newsfeed(json_data):
+    """Parse raw newsfeed JSON into a list of feed items."""
+    items = []
+    try:
+        if not isinstance(json_data, dict):
+            return items
+
+        result = json_data.get("result")
+        if not isinstance(result, dict):
+            return items
+
+        feed = result.get("feed")
+        if not isinstance(feed, list):
+            return items
+
+        for entry in feed:
+            item_type = entry.get("type", "unknown")
+            content = entry.get("content") or {}
+            stats = entry.get("stats") or {}
+
+            # Extract gallery info
+            gallery = content.get("gallery") or {}
+            images = gallery.get("images") or []
+            image_count = gallery.get("count_all", len(images))
+            first_image = images[0].get("fullsize") if images else None
+
+            # Extract video info
+            video = content.get("video") or {}
+            video_url = video.get("url")
+
+            # Extract file/invoice info
+            file_info = content.get("file") or {}
+            file_url = file_info.get("src")
+
+            # Latest comment
+            latest_comments = entry.get("latest_comments") or []
+            latest_comment = None
+            if latest_comments:
+                c = latest_comments[0]
+                latest_comment = {
+                    "author": c.get("sender_name"),
+                    "text": c.get("comment"),
+                    "date": c.get("date_friendly"),
+                }
+
+            parsed_item = {
+                "id": entry.get("id"),
+                "type": item_type,
+                "title": content.get("title") or entry.get("title") or "",
+                "description": content.get("description") or "",
+                "date": entry.get("date"),
+                "date_friendly": entry.get("date_friendly"),
+                "author": f"{(entry.get('user') or {}).get('first_name', '')} {(entry.get('user') or {}).get('last_name', '')}".strip(),
+                "likes": stats.get("likes", 0),
+                "comments": stats.get("comments", 0),
+                "image_count": image_count if images else 0,
+                "first_image_url": first_image,
+                "video_url": video_url,
+                "file_url": file_url,
+                "latest_comment": latest_comment,
+                "group": None,
+            }
+
+            # Extract group info
+            groups = entry.get("groups") or []
+            if groups:
+                parsed_item["group"] = groups[0].get("name")
+
+            # Invoice-specific fields
+            if item_type == "invoice":
+                parsed_item["invoice_subtitle1"] = content.get("subtitle1")
+                parsed_item["invoice_subtitle2"] = content.get("subtitle2")
+
+            items.append(parsed_item)
+
+    except Exception as e:
+        _LOGGER.error("Error parsing kinderpedia newsfeed: %s", e)
+
+    return items
+
+
 class KinderpediaDataUpdateCoordinator(DataUpdateCoordinator):
     def __init__(self, hass: HomeAssistant, api: KinderpediaAPI) -> None:
         self.api = api
@@ -146,9 +227,14 @@ class KinderpediaDataUpdateCoordinator(DataUpdateCoordinator):
                 _LOGGER.debug("Kinderpedia: Raw timeline for %s: %s", key, timeline_raw)
                 parsed_days = _parse_timeline(timeline_raw)
 
+                newsfeed_raw = await self.api.fetch_newsfeed(child_id, kg_id)
+                _LOGGER.debug("Kinderpedia: Raw newsfeed for %s: %s", key, newsfeed_raw)
+                parsed_feed = _parse_newsfeed(newsfeed_raw)
+
                 result["children"][key] = {
                     "child": child,
                     "days": parsed_days,
+                    "newsfeed": parsed_feed,
                 }
 
             _LOGGER.debug("Kinderpedia data successfully fetched for %d children", len(children))

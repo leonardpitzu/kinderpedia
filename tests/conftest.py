@@ -115,6 +115,92 @@ MOCK_CORE_RESPONSE = {
     }
 }
 
+MOCK_NEWSFEED_RAW = {
+    "code": "",
+    "message": "",
+    "result": {
+        "feed": [
+            {
+                "id": 37973,
+                "type": "gallery",
+                "user": {
+                    "id": 276902,
+                    "first_name": "Alina",
+                    "last_name": "Vieriu",
+                },
+                "title": "Alina Vieriu added new photos",
+                "date": "2026-02-20T15:42:42+0200",
+                "date_friendly": "20 February 2026 at 15:42",
+                "stats": {"likes": 8, "comments": 1, "liked": 0},
+                "block_comments": False,
+                "latest_comments": [
+                    {
+                        "id": 20856,
+                        "date_friendly": "20 February 2026 at 16:52",
+                        "comment": "Great photos!",
+                        "sender_name": "Jane Doe",
+                    }
+                ],
+                "allow_social_buttons": True,
+                "content": {
+                    "id": 40905205,
+                    "type": "gallery",
+                    "date": "2026-02-20T15:42:42+0200",
+                    "description": "A wonderful week of activities.",
+                    "title": "Holiday fun: recap, play and lots of energy!",
+                    "subtitle1": "20 February 2026 at 15:42",
+                    "gallery": {
+                        "images": [
+                            {
+                                "id": 40906056,
+                                "fullsize": "https://images.kinderpedia.co/photo1.jpg",
+                            }
+                        ],
+                        "count_all": 53,
+                    },
+                    "video": None,
+                    "file": None,
+                },
+                "groups": [{"id": 52118, "name": "Arici"}],
+                "children": None,
+            },
+            {
+                "id": 37736,
+                "type": "invoice",
+                "user": {
+                    "id": 130198,
+                    "first_name": "Carmen",
+                    "last_name": "Boier",
+                },
+                "title": "Carmen Boier added a new invoice",
+                "date": "2026-02-16T10:51:25+0200",
+                "date_friendly": "16 February 2026 at 10:51",
+                "stats": {"likes": 0, "comments": 0, "liked": 0},
+                "block_comments": False,
+                "latest_comments": None,
+                "allow_social_buttons": False,
+                "content": {
+                    "id": 2061070,
+                    "type": "invoice",
+                    "date": "2026-02-28T00:00:00+0200",
+                    "description": None,
+                    "title": "Invoice number: #GH018654",
+                    "subtitle1": "Due Date: 28 February 2026",
+                    "subtitle2": "Total amount: 380 EUR",
+                    "gallery": None,
+                    "video": None,
+                    "file": {
+                        "src": "https://app.kinderpedia.co/invoice.pdf",
+                        "size": "0 KB",
+                    },
+                },
+                "groups": None,
+                "children": None,
+            },
+        ]
+    },
+}
+
 MOCK_LOGIN_RESPONSE = {
     "token": "fake-jwt-token",
     "expire_at": 9999999999,
@@ -150,4 +236,5 @@ def mock_api():
         api.login = AsyncMock()
         api.fetch_children = AsyncMock(return_value=[MOCK_CHILD])
         api.fetch_timeline = AsyncMock(return_value=MOCK_TIMELINE_RAW)
+        api.fetch_newsfeed = AsyncMock(return_value=MOCK_NEWSFEED_RAW)
         yield api

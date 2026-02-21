@@ -8,7 +8,7 @@ from homeassistant.config_entries import ConfigEntryState
 from custom_components.kinderpedia.const import DOMAIN
 from custom_components.kinderpedia.api import KinderpediaAuthError, KinderpediaConnectionError
 
-from tests.conftest import MOCK_CHILD, MOCK_TIMELINE_RAW
+from tests.conftest import MOCK_CHILD, MOCK_TIMELINE_RAW, MOCK_NEWSFEED_RAW
 
 
 async def test_setup_entry(hass: HomeAssistant, mock_config_entry):
@@ -21,6 +21,7 @@ async def test_setup_entry(hass: HomeAssistant, mock_config_entry):
         api.login = AsyncMock()
         api.fetch_children = AsyncMock(return_value=[MOCK_CHILD])
         api.fetch_timeline = AsyncMock(return_value=MOCK_TIMELINE_RAW)
+        api.fetch_newsfeed = AsyncMock(return_value=MOCK_NEWSFEED_RAW)
 
         coordinator = mock_coord_cls.return_value
         coordinator.async_config_entry_first_refresh = AsyncMock()
@@ -67,6 +68,7 @@ async def test_unload_entry(hass: HomeAssistant, mock_config_entry):
         api.login = AsyncMock()
         api.fetch_children = AsyncMock(return_value=[MOCK_CHILD])
         api.fetch_timeline = AsyncMock(return_value=MOCK_TIMELINE_RAW)
+        api.fetch_newsfeed = AsyncMock(return_value=MOCK_NEWSFEED_RAW)
 
         coordinator = mock_coord_cls.return_value
         coordinator.async_config_entry_first_refresh = AsyncMock()
