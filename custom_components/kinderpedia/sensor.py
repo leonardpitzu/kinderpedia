@@ -223,26 +223,16 @@ class KinderpediaNewsfeedSensor(CoordinatorEntity, SensorEntity):
         data = self.coordinator.data or {}
         attrs = {
             "last_updated": data.get("last_updated"),
-            "item_count": len(feed),
         }
         if feed:
             latest = feed[0]
-            attrs["latest_type"] = latest.get("type")
             attrs["latest_date"] = latest.get("date")
-            attrs["latest_author"] = latest.get("author")
-            attrs["latest_group"] = latest.get("group")
-            attrs["latest_likes"] = latest.get("likes", 0)
-            attrs["latest_comments"] = latest.get("comments", 0)
-
-            if latest.get("latest_comment"):
-                attrs["latest_comment"] = latest["latest_comment"]
 
             # Recent items as compact text summaries
             attrs["recent"] = [
                 {
                     "summary": item.get("summary", ""),
                     "date": item.get("date", ""),
-                    "type": item.get("type"),
                 }
                 for item in feed[:10]
             ]

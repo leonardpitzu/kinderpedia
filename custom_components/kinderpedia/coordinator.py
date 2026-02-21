@@ -134,8 +134,12 @@ def _parse_newsfeed(json_data):
 
         for entry in feed:
             item_type = entry.get("type", "unknown")
+
+            # Skip gallery items – they add noise and no actionable info
+            if item_type == "gallery":
+                continue
+
             content = entry.get("content") or {}
-            stats = entry.get("stats") or {}
             user = entry.get("user") or {}
             author = f"{user.get('first_name', '')} {user.get('last_name', '')}".strip()
 
@@ -145,31 +149,12 @@ def _parse_newsfeed(json_data):
             # Build a human-readable summary based on type
             summary = _build_summary(item_type, title, content, author)
 
-            # Latest comment
-            latest_comments = entry.get("latest_comments") or []
-            latest_comment = None
-            if latest_comments:
-                c = latest_comments[0]
-                commenter = c.get("sender_name", "Someone")
-                comment_text = c.get("comment", "")
-                latest_comment = f"{commenter}: {comment_text}"
-
-            # Group name
-            groups = entry.get("groups") or []
-            group = groups[0].get("name") if groups else None
-
             items.append({
                 "id": entry.get("id"),
-                "type": item_type,
                 "summary": summary,
                 "title": title,
                 "description": description[:500] if description else "",
                 "date": entry.get("date_friendly", ""),
-                "author": author,
-                "likes": stats.get("likes", 0),
-                "comments": stats.get("comments", 0),
-                "latest_comment": latest_comment,
-                "group": group,
             })
 
     except Exception as e:
@@ -189,20 +174,6 @@ def _build_summary(item_type, title, content, author):
         if amount:
             parts.append(amount)
         return " — ".join(parts)
-
-    if item_type == "gallery":
-        gallery = content.get("gallery") or {}
-        count = gallery.get("count_all", 0)
-        video = content.get("video")
-        if video and not gallery.get("images"):
-            label = f"New video from {author}"
-        elif count:
-            label = f"New photos from {author} ({count})"
-        else:
-            label = f"New post from {author}"
-        if title:
-            return f"{label}: {title}"
-        return label
 
     # text / wall_post / other
     if title:
