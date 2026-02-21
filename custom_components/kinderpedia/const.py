@@ -6,4 +6,4 @@ DATA_URL = "https://app.kinderpedia.co/web-api/data/dailytimeline?week=0"
 
 API_KEY = "Web01Pari3l4em|v1.02"
 
-PLATFORMS = ["sensor"]
+PLATFORMS = ["sensor", "calendar"]
