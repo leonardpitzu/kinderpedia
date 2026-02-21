@@ -1,10 +1,9 @@
 """Tests for Kinderpedia calendar platform."""
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime
 from unittest.mock import MagicMock
 
 from homeassistant.core import HomeAssistant
-from homeassistant.util import dt as dt_util
 
 from custom_components.kinderpedia.coordinator import _parse_timeline
 from custom_components.kinderpedia.calendar import KinderpediaCalendar
