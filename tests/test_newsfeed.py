@@ -130,6 +130,7 @@ class TestNewsfeedSensor:
 
         assert "latest_date" in attrs
         assert "recent" in attrs
+        assert isinstance(attrs["recent"], str)
 
         # Removed fields
         assert "item_count" not in attrs
@@ -151,13 +152,11 @@ class TestNewsfeedSensor:
         sensor = KinderpediaNewsfeedSensor(coordinator, 111, 222, "Alice Smith", "Alice")
         recent = sensor.extra_state_attributes["recent"]
 
-        assert len(recent) == 1
-        assert "summary" in recent[0]
-        assert "date" in recent[0]
-        # type removed
-        assert "type" not in recent[0]
-        # No IDs, no URLs
-        assert "id" not in recent[0]
+        assert isinstance(recent, str)
+        # Must contain the invoice summary text
+        assert "GH018654" in recent
+        # Must contain the date emoji prefix
+        assert "📅" in recent
 
     def test_attributes_empty_feed(self):
         coordinator = self._make_coordinator([])

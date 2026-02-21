@@ -228,12 +228,12 @@ class KinderpediaNewsfeedSensor(CoordinatorEntity, SensorEntity):
             latest = feed[0]
             attrs["latest_date"] = latest.get("date")
 
-            # Recent items as compact text summaries
-            attrs["recent"] = [
-                {
-                    "summary": item.get("summary", ""),
-                    "date": item.get("date", ""),
-                }
-                for item in feed[:10]
-            ]
+            # Recent items as a single formatted string with separators
+            separator = "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            entries = []
+            for item in feed[:10]:
+                date = item.get("date", "")
+                summary = item.get("summary", "")
+                entries.append(f"📅 {date}\n{summary}")
+            attrs["recent"] = separator.join(entries)
         return attrs
