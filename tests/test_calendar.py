@@ -1,12 +1,10 @@
 """Tests for Kinderpedia calendar platform."""
 
-from datetime import date, datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import date, datetime
+from unittest.mock import MagicMock
 
-import pytest
 from homeassistant.core import HomeAssistant
 
-from custom_components.kinderpedia.const import DOMAIN
 from custom_components.kinderpedia.coordinator import _parse_timeline
 from custom_components.kinderpedia.calendar import KinderpediaCalendar
 from tests.conftest import MOCK_CHILD, MOCK_TIMELINE_RAW

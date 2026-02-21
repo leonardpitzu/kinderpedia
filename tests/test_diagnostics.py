@@ -1,6 +1,6 @@
 """Tests for Kinderpedia diagnostics."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 
 from homeassistant.core import HomeAssistant
 

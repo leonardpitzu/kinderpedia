@@ -2,9 +2,6 @@
 
 from unittest.mock import MagicMock
 
-from homeassistant.core import HomeAssistant
-
-from custom_components.kinderpedia.const import DOMAIN
 from custom_components.kinderpedia.coordinator import _parse_newsfeed
 from custom_components.kinderpedia.sensor import KinderpediaNewsfeedSensor
 from tests.conftest import MOCK_CHILD, MOCK_NEWSFEED_RAW
