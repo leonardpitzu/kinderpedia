@@ -192,7 +192,7 @@ class KinderpediaNapWeekSensor(_KinderpediaWeekSensorBase):
 
 
 class KinderpediaNewsfeedSensor(CoordinatorEntity, SensorEntity):
-    """Sensor showing the latest newsfeed item for a child."""
+    """Sensor showing the latest newsfeed activity for a child."""
 
     def __init__(self, coordinator, child_id, kg_id, device_name, first_name):
         super().__init__(coordinator)
@@ -214,7 +214,7 @@ class KinderpediaNewsfeedSensor(CoordinatorEntity, SensorEntity):
     def native_value(self):
         feed = self._get_feed()
         if feed:
-            return feed[0].get("title", "")[:255]
+            return feed[0].get("summary", "")[:255]
         return None
 
     @property
@@ -227,31 +227,22 @@ class KinderpediaNewsfeedSensor(CoordinatorEntity, SensorEntity):
         }
         if feed:
             latest = feed[0]
-            attrs["latest_id"] = latest.get("id")
             attrs["latest_type"] = latest.get("type")
-            attrs["latest_date"] = latest.get("date_friendly")
+            attrs["latest_date"] = latest.get("date")
             attrs["latest_author"] = latest.get("author")
-            attrs["latest_description"] = (latest.get("description") or "")[:500]
+            attrs["latest_group"] = latest.get("group")
             attrs["latest_likes"] = latest.get("likes", 0)
             attrs["latest_comments"] = latest.get("comments", 0)
-            attrs["latest_image_count"] = latest.get("image_count", 0)
-            attrs["latest_image_url"] = latest.get("first_image_url")
-            attrs["latest_video_url"] = latest.get("video_url")
-            attrs["latest_group"] = latest.get("group")
 
             if latest.get("latest_comment"):
-                attrs["latest_comment_author"] = latest["latest_comment"].get("author")
-                attrs["latest_comment_text"] = latest["latest_comment"].get("text")
+                attrs["latest_comment"] = latest["latest_comment"]
 
-            # Summary of recent items (up to 10)
-            attrs["recent_items"] = [
+            # Recent items as compact text summaries
+            attrs["recent"] = [
                 {
-                    "id": item.get("id"),
+                    "summary": item.get("summary", ""),
+                    "date": item.get("date", ""),
                     "type": item.get("type"),
-                    "title": item.get("title", "")[:100],
-                    "date": item.get("date_friendly"),
-                    "author": item.get("author"),
-                    "likes": item.get("likes", 0),
                 }
                 for item in feed[:10]
             ]

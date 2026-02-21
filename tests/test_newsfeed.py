@@ -10,69 +10,44 @@ from tests.conftest import MOCK_CHILD, MOCK_NEWSFEED_RAW
 class TestParseNewsfeed:
     """Tests for the _parse_newsfeed function."""
 
-    def test_parse_gallery_item(self):
-        """Gallery items are parsed with image info."""
+    def test_parse_gallery_summary(self):
+        """Gallery items get a human-readable summary."""
         items = _parse_newsfeed(MOCK_NEWSFEED_RAW)
         gallery = items[0]
 
         assert gallery["id"] == 37973
         assert gallery["type"] == "gallery"
-        assert gallery["title"] == "Holiday fun: recap, play and lots of energy!"
+        assert "New photos from Alina Vieriu (53)" in gallery["summary"]
+        assert "Holiday fun" in gallery["summary"]
         assert gallery["author"] == "Alina Vieriu"
         assert gallery["likes"] == 8
         assert gallery["comments"] == 1
-        assert gallery["image_count"] == 53
-        assert gallery["first_image_url"] == "https://images.kinderpedia.co/photo1.jpg"
         assert gallery["group"] == "Arici"
-        assert gallery["description"] == "A wonderful week of activities."
 
     def test_parse_gallery_latest_comment(self):
-        """Latest comment is extracted."""
+        """Latest comment is a flat string."""
         items = _parse_newsfeed(MOCK_NEWSFEED_RAW)
         comment = items[0]["latest_comment"]
 
         assert comment is not None
-        assert comment["author"] == "Jane Doe"
-        assert comment["text"] == "Great photos!"
+        assert "Jane Doe" in comment
+        assert "Great photos!" in comment
 
-    def test_parse_invoice_item(self):
-        """Invoice items are parsed with file URL and subtitles."""
+    def test_parse_invoice_summary(self):
+        """Invoice items produce a useful payment summary."""
         items = _parse_newsfeed(MOCK_NEWSFEED_RAW)
         invoice = items[1]
 
         assert invoice["id"] == 37736
         assert invoice["type"] == "invoice"
-        assert invoice["title"] == "Invoice number: #GH018654"
+        assert "GH018654" in invoice["summary"]
+        assert "Due Date" in invoice["summary"]
+        assert "380 EUR" in invoice["summary"]
         assert invoice["author"] == "Carmen Boier"
-        assert invoice["file_url"] == "https://app.kinderpedia.co/invoice.pdf"
-        assert invoice["invoice_subtitle1"] == "Due Date: 28 February 2026"
-        assert invoice["invoice_subtitle2"] == "Total amount: 380 EUR"
         assert invoice["latest_comment"] is None
-        assert invoice["image_count"] == 0
 
-    def test_parse_count(self):
-        """Feed count matches input."""
-        items = _parse_newsfeed(MOCK_NEWSFEED_RAW)
-        assert len(items) == 2
-
-    def test_parse_empty_json(self):
-        items = _parse_newsfeed({})
-        assert items == []
-
-    def test_parse_none_input(self):
-        items = _parse_newsfeed(None)
-        assert items == []
-
-    def test_parse_missing_result(self):
-        items = _parse_newsfeed({"code": ""})
-        assert items == []
-
-    def test_parse_empty_feed(self):
-        items = _parse_newsfeed({"result": {"feed": []}})
-        assert items == []
-
-    def test_parse_no_gallery_no_video(self):
-        """Items without gallery or video still parse cleanly."""
+    def test_parse_text_post_summary(self):
+        """Text/wall posts get author + description summary."""
         data = {
             "result": {
                 "feed": [
@@ -87,7 +62,7 @@ class TestParseNewsfeed:
                         "latest_comments": None,
                         "content": {
                             "type": "wall_post",
-                            "description": "Hello everyone",
+                            "description": "Hello everyone, welcome!",
                             "title": "",
                             "gallery": None,
                             "video": None,
@@ -101,11 +76,34 @@ class TestParseNewsfeed:
         }
         items = _parse_newsfeed(data)
         assert len(items) == 1
-        assert items[0]["image_count"] == 0
-        assert items[0]["first_image_url"] is None
-        assert items[0]["video_url"] is None
-        assert items[0]["file_url"] is None
+        assert "John Doe" in items[0]["summary"]
+        assert "Hello everyone" in items[0]["summary"]
         assert items[0]["group"] is None
+
+    def test_parse_count(self):
+        items = _parse_newsfeed(MOCK_NEWSFEED_RAW)
+        assert len(items) == 2
+
+    def test_parse_empty_json(self):
+        assert _parse_newsfeed({}) == []
+
+    def test_parse_none_input(self):
+        assert _parse_newsfeed(None) == []
+
+    def test_parse_missing_result(self):
+        assert _parse_newsfeed({"code": ""}) == []
+
+    def test_parse_empty_feed(self):
+        assert _parse_newsfeed({"result": {"feed": []}}) == []
+
+    def test_no_image_or_video_fields(self):
+        """Parsed items must not contain image/video URL fields."""
+        items = _parse_newsfeed(MOCK_NEWSFEED_RAW)
+        for item in items:
+            assert "image_count" not in item
+            assert "first_image_url" not in item
+            assert "video_url" not in item
+            assert "file_url" not in item
 
 
 class TestNewsfeedSensor:
@@ -125,47 +123,49 @@ class TestNewsfeedSensor:
         }
         return coordinator
 
-    def test_native_value_returns_latest_title(self):
+    def test_native_value_is_summary(self):
         feed = _parse_newsfeed(MOCK_NEWSFEED_RAW)
         coordinator = self._make_coordinator(feed)
         sensor = KinderpediaNewsfeedSensor(coordinator, 111, 222, "Alice Smith", "Alice")
 
-        assert sensor.native_value == "Holiday fun: recap, play and lots of energy!"
+        assert "New photos from Alina Vieriu" in sensor.native_value
 
     def test_native_value_none_when_empty(self):
         coordinator = self._make_coordinator([])
         sensor = KinderpediaNewsfeedSensor(coordinator, 111, 222, "Alice Smith", "Alice")
-
         assert sensor.native_value is None
 
-    def test_attributes_contain_latest_fields(self):
+    def test_attributes_text_only(self):
+        """Attributes must not contain image/video URLs."""
         feed = _parse_newsfeed(MOCK_NEWSFEED_RAW)
         coordinator = self._make_coordinator(feed)
         sensor = KinderpediaNewsfeedSensor(coordinator, 111, 222, "Alice Smith", "Alice")
         attrs = sensor.extra_state_attributes
 
         assert attrs["item_count"] == 2
-        assert attrs["latest_id"] == 37973
         assert attrs["latest_type"] == "gallery"
         assert attrs["latest_author"] == "Alina Vieriu"
         assert attrs["latest_likes"] == 8
-        assert attrs["latest_comments"] == 1
-        assert attrs["latest_image_count"] == 53
-        assert attrs["latest_image_url"] == "https://images.kinderpedia.co/photo1.jpg"
         assert attrs["latest_group"] == "Arici"
-        assert attrs["latest_comment_author"] == "Jane Doe"
-        assert attrs["latest_comment_text"] == "Great photos!"
+        assert "Jane Doe" in attrs["latest_comment"]
 
-    def test_attributes_recent_items(self):
+        # No image/video junk
+        assert "latest_image_url" not in attrs
+        assert "latest_image_count" not in attrs
+        assert "latest_video_url" not in attrs
+
+    def test_recent_items_are_summaries(self):
         feed = _parse_newsfeed(MOCK_NEWSFEED_RAW)
         coordinator = self._make_coordinator(feed)
         sensor = KinderpediaNewsfeedSensor(coordinator, 111, 222, "Alice Smith", "Alice")
-        attrs = sensor.extra_state_attributes
+        recent = sensor.extra_state_attributes["recent"]
 
-        recent = attrs["recent_items"]
         assert len(recent) == 2
-        assert recent[0]["id"] == 37973
-        assert recent[1]["id"] == 37736
+        assert "summary" in recent[0]
+        assert "date" in recent[0]
+        assert "type" in recent[0]
+        # No IDs, no URLs
+        assert "id" not in recent[0]
 
     def test_attributes_empty_feed(self):
         coordinator = self._make_coordinator([])
@@ -173,7 +173,7 @@ class TestNewsfeedSensor:
         attrs = sensor.extra_state_attributes
 
         assert attrs["item_count"] == 0
-        assert "latest_id" not in attrs
+        assert "latest_type" not in attrs
 
     def test_no_coordinator_data(self):
         coordinator = MagicMock()

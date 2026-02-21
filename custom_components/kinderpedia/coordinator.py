@@ -118,7 +118,7 @@ def _parse_timeline(json_data):
 
 
 def _parse_newsfeed(json_data):
-    """Parse raw newsfeed JSON into a list of feed items."""
+    """Parse raw newsfeed JSON into a list of text-friendly feed items."""
     items = []
     try:
         if not isinstance(json_data, dict):
@@ -136,66 +136,84 @@ def _parse_newsfeed(json_data):
             item_type = entry.get("type", "unknown")
             content = entry.get("content") or {}
             stats = entry.get("stats") or {}
+            user = entry.get("user") or {}
+            author = f"{user.get('first_name', '')} {user.get('last_name', '')}".strip()
 
-            # Extract gallery info
-            gallery = content.get("gallery") or {}
-            images = gallery.get("images") or []
-            image_count = gallery.get("count_all", len(images))
-            first_image = images[0].get("fullsize") if images else None
+            title = content.get("title") or ""
+            description = content.get("description") or ""
 
-            # Extract video info
-            video = content.get("video") or {}
-            video_url = video.get("url")
-
-            # Extract file/invoice info
-            file_info = content.get("file") or {}
-            file_url = file_info.get("src")
+            # Build a human-readable summary based on type
+            summary = _build_summary(item_type, title, content, author)
 
             # Latest comment
             latest_comments = entry.get("latest_comments") or []
             latest_comment = None
             if latest_comments:
                 c = latest_comments[0]
-                latest_comment = {
-                    "author": c.get("sender_name"),
-                    "text": c.get("comment"),
-                    "date": c.get("date_friendly"),
-                }
+                commenter = c.get("sender_name", "Someone")
+                comment_text = c.get("comment", "")
+                latest_comment = f"{commenter}: {comment_text}"
 
-            parsed_item = {
+            # Group name
+            groups = entry.get("groups") or []
+            group = groups[0].get("name") if groups else None
+
+            items.append({
                 "id": entry.get("id"),
                 "type": item_type,
-                "title": content.get("title") or entry.get("title") or "",
-                "description": content.get("description") or "",
-                "date": entry.get("date"),
-                "date_friendly": entry.get("date_friendly"),
-                "author": f"{(entry.get('user') or {}).get('first_name', '')} {(entry.get('user') or {}).get('last_name', '')}".strip(),
+                "summary": summary,
+                "title": title,
+                "description": description[:500] if description else "",
+                "date": entry.get("date_friendly", ""),
+                "author": author,
                 "likes": stats.get("likes", 0),
                 "comments": stats.get("comments", 0),
-                "image_count": image_count if images else 0,
-                "first_image_url": first_image,
-                "video_url": video_url,
-                "file_url": file_url,
                 "latest_comment": latest_comment,
-                "group": None,
-            }
-
-            # Extract group info
-            groups = entry.get("groups") or []
-            if groups:
-                parsed_item["group"] = groups[0].get("name")
-
-            # Invoice-specific fields
-            if item_type == "invoice":
-                parsed_item["invoice_subtitle1"] = content.get("subtitle1")
-                parsed_item["invoice_subtitle2"] = content.get("subtitle2")
-
-            items.append(parsed_item)
+                "group": group,
+            })
 
     except Exception as e:
         _LOGGER.error("Error parsing kinderpedia newsfeed: %s", e)
 
     return items
+
+
+def _build_summary(item_type, title, content, author):
+    """Build a short human-readable summary for a feed item."""
+    if item_type == "invoice":
+        due = content.get("subtitle1", "")
+        amount = content.get("subtitle2", "")
+        parts = [title]
+        if due:
+            parts.append(due)
+        if amount:
+            parts.append(amount)
+        return " — ".join(parts)
+
+    if item_type == "gallery":
+        gallery = content.get("gallery") or {}
+        count = gallery.get("count_all", 0)
+        video = content.get("video")
+        if video and not gallery.get("images"):
+            label = f"New video from {author}"
+        elif count:
+            label = f"New photos from {author} ({count})"
+        else:
+            label = f"New post from {author}"
+        if title:
+            return f"{label}: {title}"
+        return label
+
+    # text / wall_post / other
+    if title:
+        return f"{author}: {title}"
+    desc = content.get("description") or ""
+    if desc:
+        short = desc[:120].rstrip()
+        if len(desc) > 120:
+            short += "…"
+        return f"{author}: {short}"
+    return f"New post from {author}"
 
 
 class KinderpediaDataUpdateCoordinator(DataUpdateCoordinator):
