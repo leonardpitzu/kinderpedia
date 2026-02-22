@@ -51,7 +51,7 @@ async def test_calendar_builds_timed_school_events(hass: HomeAssistant):
     school_events = [e for e in events if "School" in (e.summary or "")]
     assert len(school_events) >= 1
 
-    monday_school = [e for e in school_events if "08:15" in (e.summary or "")]
+    monday_school = [e for e in school_events if e.summary == "School" and isinstance(e.start, datetime) and e.start.date() == date(2026, 2, 9)]
     assert len(monday_school) == 1
     ev = monday_school[0]
 

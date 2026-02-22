@@ -223,7 +223,7 @@ class KinderpediaCalendar(CoordinatorEntity, CalendarEntity):
                 continue
 
             # Build summary
-            summary = f"School {checkin}" if checkin_time else f"School day ({_weekday.capitalize()})"
+            summary = "School"
 
             description = "<br>".join(description_parts) if description_parts else None
 
