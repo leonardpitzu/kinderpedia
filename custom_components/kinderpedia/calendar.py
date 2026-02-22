@@ -163,10 +163,9 @@ class KinderpediaCalendar(CoordinatorEntity, CalendarEntity):
         best_date = ""
         for day_info in days.values():
             d = day_info.get("date", "")
-            if d and d != "unknown" and d <= today_str and self._has_activity(day_info):
-                if d > best_date:
-                    best_date = d
-                    best = day_info
+            if d and d != "unknown" and d <= today_str and self._has_activity(day_info) and d > best_date:
+                best_date = d
+                best = day_info
         return best
 
     @staticmethod
@@ -175,10 +174,7 @@ class KinderpediaCalendar(CoordinatorEntity, CalendarEntity):
         checkin = day_info.get("checkin", "unknown")
         if checkin and checkin != "unknown":
             return True
-        for meal in ("breakfast", "lunch", "snack"):
-            if day_info.get(f"{meal}_items"):
-                return True
-        return False
+        return any(day_info.get(f"{meal}_items") for meal in ("breakfast", "lunch", "snack"))
 
     def _build_events(self) -> list[CalendarEvent]:
         """Build calendar events from coordinator day data."""
