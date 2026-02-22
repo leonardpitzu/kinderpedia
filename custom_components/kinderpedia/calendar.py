@@ -197,10 +197,7 @@ class KinderpediaCalendar(CoordinatorEntity, CalendarEntity):
                 continue
 
             # Build summary
-            if checkin_time:
-                summary = f"School {checkin}"
-            else:
-                summary = f"School day ({_weekday.capitalize()})"
+            summary = f"School {checkin}" if checkin_time else f"School day ({_weekday.capitalize()})"
 
             description = "\n".join(description_parts) if description_parts else None
 
