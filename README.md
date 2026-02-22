@@ -1,6 +1,6 @@
 # Kinderpedia for Home Assistant
 
-A custom [Home Assistant](https://www.home-assistant.io/) integration that brings your child's [Kinderpedia](https://www.kinderpedia.com/) kindergarten data into your smart home dashboard — daily meals, nap times, check-ins, and newsfeed activity, all at a glance.
+A custom [Home Assistant](https://www.home-assistant.io/) integration that brings your child's [Kinderpedia](https://mykp.kinderpedia.co) kindergarten data into your smart home dashboard — daily meals, nap times, check-ins, and newsfeed activity, all at a glance.
 
 ## Features
 
