@@ -2,7 +2,7 @@
 
 import logging
 import re
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 
 from homeassistant.components.calendar import CalendarEntity, CalendarEvent
 from homeassistant.core import callback
@@ -14,6 +14,12 @@ from .const import DOMAIN
 _LOGGER = logging.getLogger(__name__)
 
 _NAP_TIME_RE = re.compile(r"(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})")
+_CHECKIN_TIME_RE = re.compile(r"^(\d{1,2}:\d{2})")
+
+_SCHOOL_END_TIME = time(18, 0)
+_SCHOOL_FALLBACK_START = time(8, 0)
+
+_MEAL_ICONS = {"breakfast": "🥣", "lunch": "🍽️", "snack": "🍪"}
 
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
@@ -78,18 +84,36 @@ class KinderpediaCalendar(CoordinatorEntity, CalendarEntity):
     def event(self) -> CalendarEvent | None:
         """Return the current/next event (today)."""
         events = self._build_events()
-        today = date.today()
-
-        def _to_date(dt_or_d: date | datetime) -> date:
-            return dt_or_d.date() if isinstance(dt_or_d, datetime) else dt_or_d
+        now = dt_util.now()
+        today = now.date()
 
         for ev in events:
-            ev_start = _to_date(ev.start)
-            ev_end = _to_date(ev.end)
-            # All-day events have exclusive end; timed events end same day
-            if ev_start <= today <= ev_end:
+            ev_start = ev.start if isinstance(ev.start, datetime) else datetime.combine(ev.start, time.min, tzinfo=dt_util.DEFAULT_TIME_ZONE)
+            ev_end = ev.end if isinstance(ev.end, datetime) else datetime.combine(ev.end, time.min, tzinfo=dt_util.DEFAULT_TIME_ZONE)
+            if ev_start.date() == today and ev_start <= now <= ev_end:
+                return ev
+            if ev_start.date() == today and now < ev_start:
+                return ev
+
+        # Fall back to any event whose date is today
+        for ev in events:
+            ev_date = ev.start.date() if isinstance(ev.start, datetime) else ev.start
+            if ev_date == today:
                 return ev
         return None
+
+    @property
+    def extra_state_attributes(self):
+        """Expose today's detailed day data as entity attributes."""
+        today_info = self._get_today_info()
+        if not today_info:
+            return {}
+        data = self.coordinator.data or {}
+        attrs = {"last_updated": data.get("last_updated")}
+        for key, val in today_info.items():
+            if key not in ("name", "date"):
+                attrs[key] = val
+        return attrs
 
     async def async_get_events(
         self,
@@ -115,6 +139,17 @@ class KinderpediaCalendar(CoordinatorEntity, CalendarEntity):
     # Helpers
     # ------------------------------------------------------------------
 
+    def _get_today_info(self) -> dict | None:
+        """Return the day-info dict for today, if available."""
+        data = self.coordinator.data or {}
+        child_data = data.get("children", {}).get(self._key, {})
+        days = child_data.get("days", {})
+        today_str = date.today().isoformat()
+        for _weekday, day_info in days.items():
+            if day_info.get("date") == today_str:
+                return day_info
+        return None
+
     def _build_events(self) -> list[CalendarEvent]:
         """Build calendar events from coordinator day data."""
         data = self.coordinator.data or {}
@@ -132,13 +167,11 @@ class KinderpediaCalendar(CoordinatorEntity, CalendarEntity):
             except (ValueError, TypeError):
                 continue
 
-            summary_parts: list[str] = []
             description_parts: list[str] = []
 
-            # Check-in / check-out  (shown in event title only)
+            # Parse check-in time for timed school event
             checkin = day_info.get("checkin", "unknown")
-            if checkin and checkin != "unknown":
-                summary_parts.append(f"School {checkin}")
+            checkin_time = self._parse_checkin_time(checkin)
 
             # Nap → separate timed event
             nap = day_info.get("nap", "unknown")
@@ -147,31 +180,80 @@ class KinderpediaCalendar(CoordinatorEntity, CalendarEntity):
                 if nap_event:
                     events.append(nap_event)
 
-            # Meals
+            # Meals → description
             for meal in ("breakfast", "lunch", "snack"):
                 items = day_info.get(f"{meal}_items", [])
                 pct = day_info.get(f"{meal}_percent")
                 if items:
+                    icon = _MEAL_ICONS.get(meal, "🍴")
                     food_str = ", ".join(items)
                     pct_str = f" ({pct}%)" if pct else ""
-                    description_parts.append(f"{meal.capitalize()}: {food_str}{pct_str}")
+                    description_parts.append(
+                        f"{icon} {meal.capitalize()}{pct_str}: {food_str}"
+                    )
 
-            if not summary_parts and not description_parts:
+            # Need at least a checkin or meal data to create the school event
+            if not checkin_time and not description_parts:
                 continue
 
-            summary = summary_parts[0] if summary_parts else f"School day ({_weekday})"
+            # Build summary
+            if checkin_time:
+                summary = f"School {checkin}"
+            else:
+                summary = f"School day ({_weekday.capitalize()})"
+
             description = "\n".join(description_parts) if description_parts else None
+
+            # Timed event: start at check-in (or 08:00 fallback), end at 18:00
+            # If we cannot determine a valid start, fall back to midnight end.
+            start_t = checkin_time or _SCHOOL_FALLBACK_START
+            try:
+                ev_start = datetime.combine(
+                    event_date, start_t, tzinfo=dt_util.DEFAULT_TIME_ZONE
+                )
+                ev_end = datetime.combine(
+                    event_date, _SCHOOL_END_TIME, tzinfo=dt_util.DEFAULT_TIME_ZONE
+                )
+                if ev_end <= ev_start:
+                    # Safety: end must be after start; fall back to midnight
+                    ev_end = datetime.combine(
+                        event_date + timedelta(days=1),
+                        time.min,
+                        tzinfo=dt_util.DEFAULT_TIME_ZONE,
+                    )
+            except (ValueError, TypeError):
+                ev_end = datetime.combine(
+                    event_date + timedelta(days=1),
+                    time.min,
+                    tzinfo=dt_util.DEFAULT_TIME_ZONE,
+                )
+                ev_start = datetime.combine(
+                    event_date, _SCHOOL_FALLBACK_START, tzinfo=dt_util.DEFAULT_TIME_ZONE
+                )
 
             events.append(
                 CalendarEvent(
                     summary=summary,
-                    start=event_date,
-                    end=event_date + timedelta(days=1),
+                    start=ev_start,
+                    end=ev_end,
                     description=description,
                 )
             )
 
         return events
+
+    @staticmethod
+    def _parse_checkin_time(checkin: str) -> time | None:
+        """Extract start time from a checkin string like '07:40 - by Alina'."""
+        if not checkin or checkin == "unknown":
+            return None
+        match = _CHECKIN_TIME_RE.search(checkin)
+        if not match:
+            return None
+        try:
+            return datetime.strptime(match.group(1), "%H:%M").time()
+        except ValueError:
+            return None
 
     @staticmethod
     def _build_nap_event(

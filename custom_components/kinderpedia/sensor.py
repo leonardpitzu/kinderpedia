@@ -47,11 +47,6 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
                 coordinator, child_id, kg_id, device_name, first_name
             ))
 
-            for weekday in child_data.get("days", {}):
-                new_sensors.append(KinderpediaDaySensor(
-                    coordinator, child_id, kg_id, weekday, device_name, first_name
-                ))
-
         if new_sensors:
             async_add_entities(new_sensors)
 
@@ -97,43 +92,6 @@ class KinderpediaChildInfoSensor(CoordinatorEntity, SensorEntity):
     def _get_child_data(self):
         data = self.coordinator.data or {}
         return data.get("children", {}).get(self._key)
-
-
-class KinderpediaDaySensor(CoordinatorEntity, SensorEntity):
-    def __init__(self, coordinator, child_id, kg_id, weekday_key, device_name, first_name):
-        super().__init__(coordinator)
-        self._key = f"{child_id}_{kg_id}"
-        self._weekday = weekday_key
-        self._attr_unique_id = f"{DOMAIN}_day_{child_id}_{kg_id}_{weekday_key}"
-        self._attr_name = f"{first_name.lower()} {weekday_key}"
-        self._attr_device_info = {
-            "identifiers": {(DOMAIN, f"{child_id}_{kg_id}")},
-            "name": device_name,
-            "manufacturer": "Kinderpedia",
-        }
-
-    @property
-    def native_value(self):
-        day_info = self._get_day_info()
-        return day_info.get("name", self._weekday.capitalize())
-
-    @property
-    def extra_state_attributes(self):
-        day_info = self._get_day_info()
-        data = self.coordinator.data or {}
-        attrs = {
-            "date": day_info.get("date"),
-            "last_updated": data.get("last_updated"),
-        }
-        for key, val in day_info.items():
-            if key not in ["name", "date"]:
-                attrs[key] = val
-        return attrs
-
-    def _get_day_info(self):
-        data = self.coordinator.data or {}
-        child_data = data.get("children", {}).get(self._key, {})
-        return child_data.get("days", {}).get(self._weekday, {})
 
 
 class _KinderpediaWeekSensorBase(CoordinatorEntity, SensorEntity):
@@ -193,6 +151,8 @@ class KinderpediaNapWeekSensor(_KinderpediaWeekSensorBase):
 
 class KinderpediaNewsfeedSensor(CoordinatorEntity, SensorEntity):
     """Sensor showing the latest newsfeed activity for a child."""
+
+    _attr_icon = "mdi:newspaper-variant-outline"
 
     def __init__(self, coordinator, child_id, kg_id, device_name, first_name):
         super().__init__(coordinator)
