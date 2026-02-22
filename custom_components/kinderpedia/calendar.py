@@ -225,7 +225,7 @@ class KinderpediaCalendar(CoordinatorEntity, CalendarEntity):
             # Build summary
             summary = f"School {checkin}" if checkin_time else f"School day ({_weekday.capitalize()})"
 
-            description = "\n\n".join(description_parts) if description_parts else None
+            description = "<br>".join(description_parts) if description_parts else None
 
             # Timed event: start at check-in (or 08:00 fallback), end at 18:00
             # If we cannot determine a valid start, fall back to midnight end.
