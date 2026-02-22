@@ -194,7 +194,7 @@ async def test_calendar_async_get_events_full_week(hass: HomeAssistant):
 # -------------------------------------------------------------------
 
 async def test_calendar_extra_state_attributes_today(hass: HomeAssistant):
-    """Calendar entity exposes today's day data as attributes."""
+    """Calendar entity exposes today's day data as attributes when today has data."""
     coordinator = MagicMock()
     data = _make_coordinator_data()
 
@@ -213,20 +213,39 @@ async def test_calendar_extra_state_attributes_today(hass: HomeAssistant):
     assert "Cereal" in attrs["breakfast_items"]
     assert "breakfast_percent" in attrs
     assert attrs["breakfast_percent"] == 80
+    assert attrs["date"] == today_str
 
 
-async def test_calendar_extra_state_attributes_empty_when_not_today(hass: HomeAssistant):
-    """Calendar attributes are empty when no day matches today."""
+async def test_calendar_extra_state_attributes_falls_back_to_latest(hass: HomeAssistant):
+    """When today is not in the data, attributes show the most recent school day."""
     coordinator = MagicMock()
     data = _make_coordinator_data()
+    # All dates are 2026-02-09..13 (in the past) — none match today
     coordinator.data = data
     cal = _make_calendar(coordinator)
+    attrs = cal.extra_state_attributes
 
-    today_str = date.today().isoformat()
-    days = data["children"]["111_222"]["days"]
-    matches_today = any(d.get("date") == today_str for d in days.values())
-    if not matches_today:
-        assert cal.extra_state_attributes == {}
+    # Monday (2026-02-09) is the only day with real activity in MOCK_TIMELINE_RAW
+    assert attrs.get("date") == "2026-02-09"
+    assert "checkin" in attrs
+    assert attrs["checkin"] == "08:15 - 16:30"
+    assert "breakfast_items" in attrs
+    assert "Cereal" in attrs["breakfast_items"]
+
+
+async def test_calendar_extra_state_attributes_skips_empty_days(hass: HomeAssistant):
+    """Days with no checkin or meals are not returned as the latest day."""
+    coordinator = MagicMock()
+    data = _make_coordinator_data()
+    # Wipe Monday's activity
+    data["children"]["111_222"]["days"]["monday"]["checkin"] = "unknown"
+    data["children"]["111_222"]["days"]["monday"].pop("breakfast_items", None)
+    data["children"]["111_222"]["days"]["monday"].pop("lunch_items", None)
+    data["children"]["111_222"]["days"]["monday"].pop("snack_items", None)
+    coordinator.data = data
+    cal = _make_calendar(coordinator)
+    # With all activity removed from the only data-rich day, attrs should be empty
+    assert cal.extra_state_attributes == {}
 
 
 # -------------------------------------------------------------------

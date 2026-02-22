@@ -104,13 +104,16 @@ class KinderpediaCalendar(CoordinatorEntity, CalendarEntity):
 
     @property
     def extra_state_attributes(self):
-        """Expose today's detailed day data as entity attributes."""
-        today_info = self._get_today_info()
-        if not today_info:
+        """Expose the latest school-day data as entity attributes."""
+        day_info = self._get_latest_day_info()
+        if not day_info:
             return {}
         data = self.coordinator.data or {}
-        attrs = {"last_updated": data.get("last_updated")}
-        for key, val in today_info.items():
+        attrs = {
+            "date": day_info.get("date"),
+            "last_updated": data.get("last_updated"),
+        }
+        for key, val in day_info.items():
             if key not in ("name", "date"):
                 attrs[key] = val
         return attrs
@@ -139,16 +142,43 @@ class KinderpediaCalendar(CoordinatorEntity, CalendarEntity):
     # Helpers
     # ------------------------------------------------------------------
 
-    def _get_today_info(self) -> dict | None:
-        """Return the day-info dict for today, if available."""
+    def _get_latest_day_info(self) -> dict | None:
+        """Return the most recent day-info with real activity.
+
+        Prefers today if available, otherwise falls back to the latest
+        past day that has a valid checkin or meal data.
+        """
         data = self.coordinator.data or {}
         child_data = data.get("children", {}).get(self._key, {})
         days = child_data.get("days", {})
         today_str = date.today().isoformat()
-        for _weekday, day_info in days.items():
-            if day_info.get("date") == today_str:
+
+        # Prefer today
+        for day_info in days.values():
+            if day_info.get("date") == today_str and self._has_activity(day_info):
                 return day_info
-        return None
+
+        # Fall back to the most recent day with activity
+        best: dict | None = None
+        best_date = ""
+        for day_info in days.values():
+            d = day_info.get("date", "")
+            if d and d != "unknown" and d <= today_str and self._has_activity(day_info):
+                if d > best_date:
+                    best_date = d
+                    best = day_info
+        return best
+
+    @staticmethod
+    def _has_activity(day_info: dict) -> bool:
+        """Return True if a day has meaningful data (checkin or meals)."""
+        checkin = day_info.get("checkin", "unknown")
+        if checkin and checkin != "unknown":
+            return True
+        for meal in ("breakfast", "lunch", "snack"):
+            if day_info.get(f"{meal}_items"):
+                return True
+        return False
 
     def _build_events(self) -> list[CalendarEvent]:
         """Build calendar events from coordinator day data."""

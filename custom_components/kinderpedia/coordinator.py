@@ -1,6 +1,6 @@
 import logging
 import re
-from datetime import timedelta
+from datetime import date as date_cls, timedelta
 
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.core import HomeAssistant
@@ -13,12 +13,12 @@ _LOGGER = logging.getLogger(__name__)
 _FOOD_TYPE_MAP = {"md": "breakfast", "mp": "lunch", "mp2": "lunch", "g": "snack"}
 _NAP_PATTERN = re.compile(r"\s*(\d+)\s*h\s*and\s*(\d+)\s*min")
 _NAP_PATTERN_MIN = re.compile(r"\s*(\d+)\s*min")
+_WEEKDAY_NAMES = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
 
 
 def _parse_timeline(json_data):
     """Parse raw timeline JSON into a weekday-keyed dict of day data."""
     parsed = {}
-    weekday_map = ["monday", "tuesday", "wednesday", "thursday", "friday"]
 
     try:
         days = {}
@@ -29,87 +29,71 @@ def _parse_timeline(json_data):
                 if isinstance(dailytimeline, dict):
                     days = dailytimeline.get("days", {})
 
-        sorted_day_items = sorted(days.items())
-        for i, weekday in enumerate(weekday_map):
-            if i < len(sorted_day_items):
-                date_key, day_data = sorted_day_items[i]
-                day_data = day_data or {}
+        for date_key, day_data in sorted(days.items()):
+            day_data = day_data or {}
 
-                day_entry = {
-                    "name": weekday,
-                    "date": date_key,
-                    "checkin": "unknown",
-                    "nap": "unknown"
-                }
+            # Derive weekday name from the date string
+            try:
+                parsed_date = date_cls.fromisoformat(date_key)
+                weekday = _WEEKDAY_NAMES[parsed_date.weekday()]
+            except (ValueError, TypeError):
+                continue
 
-                for item in day_data.get("data", []) or []:
-                    item_id = item.get("id", "")
-                    if item_id == "checkin":
-                        day_entry["checkin"] = item.get("subtitle", "unknown")
-                    elif item_id == "nap":
-                        day_entry["nap"] = item.get("subtitle", "unknown")
-                        if day_entry["nap"] != "unknown":
-                            match = _NAP_PATTERN.search(day_entry["nap"])
-                            if match:
-                                hours = int(match.group(1))
-                                minutes = int(match.group(2))
-                                day_entry["nap_duration"] = hours * 60 + minutes
+            day_entry = {
+                "name": weekday,
+                "date": date_key,
+                "checkin": "unknown",
+                "nap": "unknown"
+            }
+
+            for item in day_data.get("data", []) or []:
+                item_id = item.get("id", "")
+                if item_id == "checkin":
+                    day_entry["checkin"] = item.get("subtitle", "unknown")
+                elif item_id == "nap":
+                    day_entry["nap"] = item.get("subtitle", "unknown")
+                    if day_entry["nap"] != "unknown":
+                        match = _NAP_PATTERN.search(day_entry["nap"])
+                        if match:
+                            hours = int(match.group(1))
+                            minutes = int(match.group(2))
+                            day_entry["nap_duration"] = hours * 60 + minutes
+                        else:
+                            match_min = _NAP_PATTERN_MIN.search(day_entry["nap"])
+                            if match_min:
+                                day_entry["nap_duration"] = int(match_min.group(1))
                             else:
-                                match_min = _NAP_PATTERN_MIN.search(day_entry["nap"])
-                                if match_min:
-                                    day_entry["nap_duration"] = int(match_min.group(1))
+                                day_entry["nap_duration"] = 0
+                elif item_id.startswith("food_"):
+                    details = item.get("details")
+                    if isinstance(details, dict):
+                        food = details.get("food") or {}
+                        meals = food.get("meals", []) or []
+
+                        lunch_percents = []
+
+                        for meal in meals:
+                            food_type = _FOOD_TYPE_MAP.get(meal.get("type", "unknown"), meal.get("type", "unknown"))
+                            percent = meal.get("percent")
+                            if meal.get("type") in ["mp", "mp2"] and isinstance(percent, (int, float)):
+                                lunch_percents.append(percent)
+
+                            menus = meal.get("menus", []) or []
+                            if menus:
+                                day_entry[f"{food_type}_items"] = [m.get("name", "unknown") for m in menus]
+                                totals = meal.get("totals", {}) or {}
+                                day_entry[f"{food_type}_kcal"] = totals.get("kcal", 0)
+                                day_entry[f"{food_type}_weight"] = totals.get("weight", 0)
+
+                            if meal.get("type") not in ["mp", "mp2"]:
+                                day_entry[f"{food_type}_percent"] = percent if percent is not None else 0
+                            else:
+                                if lunch_percents:
+                                    day_entry["lunch_percent"] = round(sum(lunch_percents) / len(lunch_percents), 1)
                                 else:
-                                    day_entry["nap_duration"] = 0
-                    elif item_id.startswith("food_"):
-                        details = item.get("details")
-                        if isinstance(details, dict):
-                            food = details.get("food") or {}
-                            meals = food.get("meals", []) or []
+                                    day_entry["lunch_percent"] = 0
 
-                            lunch_percents = []
-
-                            for meal in meals:
-                                food_type = _FOOD_TYPE_MAP.get(meal.get("type", "unknown"), meal.get("type", "unknown"))
-                                percent = meal.get("percent")
-                                if meal.get("type") in ["mp", "mp2"] and isinstance(percent, (int, float)):
-                                    lunch_percents.append(percent)
-
-                                menus = meal.get("menus", []) or []
-                                if menus:
-                                    day_entry[f"{food_type}_items"] = [m.get("name", "unknown") for m in menus]
-                                    totals = meal.get("totals", {}) or {}
-                                    day_entry[f"{food_type}_kcal"] = totals.get("kcal", 0)
-                                    day_entry[f"{food_type}_weight"] = totals.get("weight", 0)
-
-                                if meal.get("type") not in ["mp", "mp2"]:
-                                    day_entry[f"{food_type}_percent"] = percent if percent is not None else 0
-                                else:
-                                    if lunch_percents:
-                                        day_entry["lunch_percent"] = round(sum(lunch_percents) / len(lunch_percents), 1)
-                                    else:
-                                        day_entry["lunch_percent"] = 0
-
-                parsed[weekday] = day_entry
-            else:
-                parsed[weekday] = {
-                    "name": weekday,
-                    "date": "unknown",
-                    "checkin": "unknown",
-                    "nap": "unknown",
-                    "nap_duration": 0,
-                    "breakfast_items": [],
-                    "breakfast_kcal": 0,
-                    "breakfast_weight": 0,
-                    "breakfast_percent": 0,
-                    "lunch_items": [],
-                    "lunch_kcal": 0,
-                    "lunch_weight": 0,
-                    "lunch_percent": 0,
-                    "snack_items": [],
-                    "snack_kcal": 0,
-                    "snack_weight": 0,
-                    "snack_percent": 0,
-                }
+            parsed[weekday] = day_entry
 
     except Exception as e:
         _LOGGER.error("Error parsing kinderpedia timeline: %s", e)
