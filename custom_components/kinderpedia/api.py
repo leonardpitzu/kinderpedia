@@ -120,6 +120,7 @@ class KinderpediaAPI:
         """
         await self.login()
         url = DATA_URL.format(week=week_offset)
+        _LOGGER.debug("Fetching timeline from %s", url)
         headers = {
                 "x-child-id": str(child_id),
                 "x-kindergarten-id": str(kindergarten_id),

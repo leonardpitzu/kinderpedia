@@ -130,40 +130,51 @@ class KinderpediaHistoryStore:
         offset = -1
 
         while True:
+            _LOGGER.info("Backfill: fetching week offset %d for child %s_%s", offset, child_id, kg_id)
             try:
                 raw = await api.fetch_timeline(child_id, kg_id, week_offset=offset)
             except Exception:
                 _LOGGER.warning(
-                    "Backfill: API error at week offset %d, stopping", offset
+                    "Backfill: API error at week offset %d, stopping", offset,
+                    exc_info=True,
                 )
                 break
 
             days = parse_fn(raw)
             if not days:
-                _LOGGER.debug("Backfill: empty response at offset %d, done", offset)
+                _LOGGER.info(
+                    "Backfill: no parseable days at offset %d, stopping (raw keys: %s)",
+                    offset,
+                    list(raw.keys()) if isinstance(raw, dict) else type(raw).__name__,
+                )
                 break
 
             # The first date in the parsed days tells us which Monday it is
             monday_iso = self._monday_from_days(days)
             if not monday_iso:
+                _LOGGER.info(
+                    "Backfill: could not determine monday from offset %d (day dates: %s), stopping",
+                    offset,
+                    [d.get('date') for d in days.values()],
+                )
                 break
 
             if monday_iso in self._weeks:
-                _LOGGER.debug(
-                    "Backfill: week %s already stored, stopping", monday_iso
+                _LOGGER.info(
+                    "Backfill: week %s already stored, caught up", monday_iso
                 )
                 break
 
             if not any(_has_real_data(d) for d in days.values()):
-                _LOGGER.debug(
-                    "Backfill: week %s has no real data, stopping", monday_iso
+                _LOGGER.info(
+                    "Backfill: week %s has no real data (enrollment start?), stopping", monday_iso
                 )
                 break
 
             self._weeks[monday_iso] = days
             stored_count += 1
             await self.async_save()
-            _LOGGER.debug("Backfill: stored week %s (offset %d)", monday_iso, offset)
+            _LOGGER.info("Backfill: stored week %s (offset %d, total %d)", monday_iso, offset, stored_count)
 
             offset -= 1
             if delay > 0:

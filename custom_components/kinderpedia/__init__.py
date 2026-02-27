@@ -71,16 +71,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     # Initial backfill (if stores are empty) — runs in background
     # ------------------------------------------------------------------
     async def _initial_backfill():
-        for child in children:
-            key = f"{child['child_id']}_{child['kindergarten_id']}"
-            store = history_stores.get(key)
-            if store and not store.weeks:
-                _LOGGER.info("Starting initial backfill for %s", key)
-                await store.async_backfill(
-                    api, child["child_id"], child["kindergarten_id"], _parse_timeline
-                )
-                # Refresh coordinator so calendar picks up new data
-                await coordinator.async_request_refresh()
+        try:
+            for child in children:
+                key = f"{child['child_id']}_{child['kindergarten_id']}"
+                store = history_stores.get(key)
+                if store and not store.weeks:
+                    _LOGGER.info("Starting initial history backfill for %s", key)
+                    count = await store.async_backfill(
+                        api, child["child_id"], child["kindergarten_id"], _parse_timeline
+                    )
+                    if count > 0:
+                        await coordinator.async_request_refresh()
+                else:
+                    _LOGGER.info(
+                        "Skipping backfill for %s (store has %d weeks)",
+                        key, len(store.weeks) if store else 0,
+                    )
+        except Exception:
+            _LOGGER.exception("Unexpected error during initial history backfill")
 
     # Fire-and-forget: runs in background without blocking setup
     entry.async_create_background_task(hass, _initial_backfill(), "kinderpedia_backfill")
