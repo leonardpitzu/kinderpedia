@@ -112,8 +112,14 @@ class KinderpediaAPI:
 
         return enriched
 
-    async def fetch_timeline(self, child_id, kindergarten_id):
+    async def fetch_timeline(self, child_id, kindergarten_id, week_offset=0):
+        """Fetch the daily timeline for a child.
+
+        *week_offset* is relative to the current week: 0 = this week,
+        -1 = last week, -2 = two weeks ago, etc.
+        """
         await self.login()
+        url = DATA_URL.format(week=week_offset)
         headers = {
                 "x-child-id": str(child_id),
                 "x-kindergarten-id": str(kindergarten_id),
@@ -122,7 +128,7 @@ class KinderpediaAPI:
                 "cookie": f"JWToken={self.token}",
             }
         try:
-            async with self.session.get(DATA_URL, headers=headers) as resp:
+            async with self.session.get(url, headers=headers) as resp:
                 if resp.status != 200:
                     raise KinderpediaConnectionError(f"Timeline fetch failed: HTTP {resp.status}")
                 return await resp.json()

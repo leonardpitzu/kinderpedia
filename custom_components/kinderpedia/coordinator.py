@@ -183,8 +183,15 @@ def _build_summary(item_type, title, content, author):
 
 
 class KinderpediaDataUpdateCoordinator(DataUpdateCoordinator):
-    def __init__(self, hass: HomeAssistant, api: KinderpediaAPI) -> None:
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        api: KinderpediaAPI,
+        history_stores: dict | None = None,
+    ) -> None:
         self.api = api
+        # {child_key: KinderpediaHistoryStore}
+        self._history_stores: dict = history_stores or {}
         super().__init__(
             hass,
             _LOGGER,
@@ -220,6 +227,22 @@ class KinderpediaDataUpdateCoordinator(DataUpdateCoordinator):
                     "days": parsed_days,
                     "newsfeed": parsed_feed,
                 }
+
+                # Merge historical weeks underneath current-week data.
+                # Historical days use their date string as key; current-week
+                # days use weekday names.  We store all days keyed by date so
+                # the calendar can iterate uniformly.
+                history_store = self._history_stores.get(key)
+                if history_store is not None:
+                    historical_days = history_store.get_all_days()
+                    # Current week takes precedence – never overwrite live data
+                    current_dates = {
+                        d.get("date") for d in parsed_days.values() if d.get("date")
+                    }
+                    for date_iso, day_entry in historical_days.items():
+                        if date_iso not in current_dates:
+                            # Use date_iso as key to avoid weekday name collisions
+                            result["children"][key]["days"][date_iso] = day_entry
 
             _LOGGER.debug("Kinderpedia data successfully fetched for %d children", len(children))
             return result

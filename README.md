@@ -15,6 +15,8 @@ A calendar entity (`<name> school`) shows the full weekly timeline your kinderga
   🍪 Snack: Biscuiți cu ovăz
   ```
 - **Nap event** — a separate timed event using the actual nap start/end times reported by the teacher.
+- **Absence handling** — when a child is marked absent (motivated or not), no School or Nap events are created for that day. The planned menu is still fetched by the API, but it won't clutter your calendar.
+- **Historical data** — past weeks are automatically archived so the calendar can display the full kindergarten history, not just the current week. See [History & backfill](#history--backfill) below.
 
 The calendar entity also exposes **detailed attributes** for the most recent school day (or today, if available): `checkin`, `nap`, `nap_duration`, `breakfast_items`, `breakfast_percent`, `breakfast_kcal`, `lunch_items`, `lunch_percent`, `lunch_kcal`, `snack_items`, and more. These are ready to use in template cards or automations.
 
@@ -51,6 +53,34 @@ The calendar entity also exposes **detailed attributes** for the most recent sch
 4. The integration will discover all children linked to your account and create entities automatically.
 
 Data is polled every 15 minutes.
+
+## History & backfill
+
+The Kinderpedia API returns one week of timeline data at a time. This integration stores past weeks locally so the calendar shows the **full history** — not just the current week.
+
+### How it works
+
+| Scenario | What happens | Frequency |
+|---|---|---|
+| **Normal polling** | Fetches the current week (`week=0`) | Every 15 minutes |
+| **Weekly archive** | Archives the just-completed previous week | Once per week (Monday at 03:00) |
+| **Initial backfill** | Walks backwards through all past weeks until it reaches the first week of enrollment | Once, automatically on first install |
+| **Manual re-sync** | Triggered via the `kinderpedia.backfill_history` service | On demand |
+
+- Past weeks are **immutable** — once stored they are never re-fetched.
+- Data is persisted in Home Assistant's `.storage` directory (one file per child).
+- The initial backfill runs in the background and makes one API request every 5 seconds to avoid overloading the server. For a child enrolled since September 2024, that's roughly 75 weeks — about 6 minutes of quiet background work.
+- After the initial backfill, the only recurring cost is **one extra API call per week**.
+
+### Manual backfill service
+
+If you need to re-trigger the backfill (e.g. after clearing storage), call the service:
+
+```yaml
+service: kinderpedia.backfill_history
+```
+
+No parameters needed — it runs for all configured children.
 
 ## Dashboard ideas
 

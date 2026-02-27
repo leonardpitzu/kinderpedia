@@ -19,5 +19,11 @@
     "abort": {
       "already_configured": "This Kinderpedia account is already configured"
     }
+  },
+  "services": {
+    "backfill_history": {
+      "name": "Backfill history",
+      "description": "Fetch all historical weekly timelines from Kinderpedia and store them locally. This only needs to run once; subsequent weeks are archived automatically every Monday."
+    }
   }
 }
