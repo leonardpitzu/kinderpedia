@@ -130,11 +130,11 @@ class KinderpediaHistoryStore:
         offset = -1
 
         while True:
-            _LOGGER.info("Backfill: fetching week offset %d for child %s_%s", offset, child_id, kg_id)
+            _LOGGER.debug("Backfill: fetching week offset %d for child %s_%s", offset, child_id, kg_id)
             try:
                 raw = await api.fetch_timeline(child_id, kg_id, week_offset=offset)
             except Exception:
-                _LOGGER.warning(
+                _LOGGER.debug(
                     "Backfill: API error at week offset %d, stopping", offset,
                     exc_info=True,
                 )
@@ -142,7 +142,7 @@ class KinderpediaHistoryStore:
 
             days = parse_fn(raw)
             if not days:
-                _LOGGER.info(
+                _LOGGER.debug(
                     "Backfill: no parseable days at offset %d, stopping (raw keys: %s)",
                     offset,
                     list(raw.keys()) if isinstance(raw, dict) else type(raw).__name__,
@@ -152,7 +152,7 @@ class KinderpediaHistoryStore:
             # The first date in the parsed days tells us which Monday it is
             monday_iso = self._monday_from_days(days)
             if not monday_iso:
-                _LOGGER.info(
+                _LOGGER.debug(
                     "Backfill: could not determine monday from offset %d (day dates: %s), stopping",
                     offset,
                     [d.get('date') for d in days.values()],
@@ -160,13 +160,13 @@ class KinderpediaHistoryStore:
                 break
 
             if monday_iso in self._weeks:
-                _LOGGER.info(
+                _LOGGER.debug(
                     "Backfill: week %s already stored, caught up", monday_iso
                 )
                 break
 
             if not any(_has_real_data(d) for d in days.values()):
-                _LOGGER.info(
+                _LOGGER.debug(
                     "Backfill: week %s has no real data (enrollment start?), stopping", monday_iso
                 )
                 break
@@ -174,13 +174,13 @@ class KinderpediaHistoryStore:
             self._weeks[monday_iso] = days
             stored_count += 1
             await self.async_save()
-            _LOGGER.info("Backfill: stored week %s (offset %d, total %d)", monday_iso, offset, stored_count)
+            _LOGGER.debug("Backfill: stored week %s (offset %d, total %d)", monday_iso, offset, stored_count)
 
             offset -= 1
             if delay > 0:
                 await asyncio.sleep(delay)
 
-        _LOGGER.info("Backfill complete: %d new weeks stored", stored_count)
+        _LOGGER.debug("Backfill complete for %s_%s: %d new weeks stored", child_id, kg_id, stored_count)
         return stored_count
 
     async def async_archive_last_week(
@@ -200,7 +200,7 @@ class KinderpediaHistoryStore:
         try:
             raw = await api.fetch_timeline(child_id, kg_id, week_offset=-1)
         except Exception:
-            _LOGGER.warning("Weekly archive: API error fetching last week")
+            _LOGGER.debug("Weekly archive: API error fetching last week")
             return False
 
         days = parse_fn(raw)
@@ -217,7 +217,7 @@ class KinderpediaHistoryStore:
 
         self._weeks[monday_iso] = days
         await self.async_save()
-        _LOGGER.info("Weekly archive: stored week %s", monday_iso)
+        _LOGGER.debug("Weekly archive: stored week %s", monday_iso)
         return True
 
     # ------------------------------------------------------------------

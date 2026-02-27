@@ -76,14 +76,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 key = f"{child['child_id']}_{child['kindergarten_id']}"
                 store = history_stores.get(key)
                 if store and not store.weeks:
-                    _LOGGER.info("Starting initial history backfill for %s", key)
+                    _LOGGER.debug("Starting initial history backfill for %s", key)
                     count = await store.async_backfill(
                         api, child["child_id"], child["kindergarten_id"], _parse_timeline
                     )
                     if count > 0:
                         await coordinator.async_request_refresh()
                 else:
-                    _LOGGER.info(
+                    _LOGGER.debug(
                         "Skipping backfill for %s (store has %d weeks)",
                         key, len(store.weeks) if store else 0,
                     )
