@@ -187,3 +187,87 @@ class TestParseTimeline:
         result = _parse_timeline(raw)
         assert "wednesday" in result
         assert result["wednesday"]["checkin"] == "09:00 - 15:00"
+
+    def test_absence_motivated_parsed(self):
+        """Motivated absence is detected and stored in the day entry."""
+        raw = _make_week({
+            "data": [
+                {
+                    "id": "checkin",
+                    "subtitle": "Absent",
+                    "details": {
+                        "presence": {
+                            "temperature": None,
+                            "absence": {
+                                "reason": "vacation",
+                                "motivated": True,
+                                "info": "",
+                                "by": "Parent Name",
+                            },
+                        }
+                    },
+                },
+            ]
+        })
+        result = _parse_timeline(raw)
+        monday = result["monday"]
+        assert monday["checkin"] == "Absent"
+        assert monday["absent"] is True
+        assert monday["absence_reason"] == "vacation"
+        assert monday["absence_motivated"] is True
+        assert monday["absence_by"] == "Parent Name"
+
+    def test_absence_unmotivated_parsed(self):
+        """Unmotivated absence is also detected."""
+        raw = _make_week({
+            "data": [
+                {
+                    "id": "checkin",
+                    "subtitle": "Absent",
+                    "details": {
+                        "presence": {
+                            "temperature": None,
+                            "absence": {
+                                "reason": "sick",
+                                "motivated": False,
+                                "info": "",
+                                "by": "",
+                            },
+                        }
+                    },
+                },
+            ]
+        })
+        result = _parse_timeline(raw)
+        monday = result["monday"]
+        assert monday["absent"] is True
+        assert monday["absence_motivated"] is False
+
+    def test_no_absence_when_checked_in(self):
+        """Normal check-in does not set the absent flag."""
+        raw = _make_week({
+            "data": [
+                {
+                    "id": "checkin",
+                    "subtitle": "08:15 - by Parent Name",
+                    "details": {
+                        "presence": {
+                            "temperature": None,
+                            "absence": None,
+                        }
+                    },
+                },
+            ]
+        })
+        result = _parse_timeline(raw)
+        assert "absent" not in result["monday"]
+
+    def test_no_absence_without_details(self):
+        """Checkin without details dict does not set the absent flag."""
+        raw = _make_week({
+            "data": [
+                {"id": "checkin", "subtitle": "08:15 - 16:30"},
+            ]
+        })
+        result = _parse_timeline(raw)
+        assert "absent" not in result["monday"]

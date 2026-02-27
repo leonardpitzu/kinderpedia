@@ -193,6 +193,10 @@ class KinderpediaCalendar(CoordinatorEntity, CalendarEntity):
             except (ValueError, TypeError):
                 continue
 
+            # Skip absent days — no school or nap events
+            if day_info.get("absent"):
+                continue
+
             description_parts: list[str] = []
 
             # Parse check-in time for timed school event

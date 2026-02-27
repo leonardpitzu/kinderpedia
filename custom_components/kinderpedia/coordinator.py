@@ -50,6 +50,17 @@ def _parse_timeline(json_data):
                 item_id = item.get("id", "")
                 if item_id == "checkin":
                     day_entry["checkin"] = item.get("subtitle", "unknown")
+                    # Detect absence from presence details
+                    details = item.get("details")
+                    if isinstance(details, dict):
+                        presence = details.get("presence")
+                        if isinstance(presence, dict):
+                            absence = presence.get("absence")
+                            if isinstance(absence, dict):
+                                day_entry["absent"] = True
+                                day_entry["absence_reason"] = absence.get("reason", "")
+                                day_entry["absence_motivated"] = absence.get("motivated", False)
+                                day_entry["absence_by"] = absence.get("by", "")
                 elif item_id == "nap":
                     day_entry["nap"] = item.get("subtitle", "unknown")
                     if day_entry["nap"] != "unknown":

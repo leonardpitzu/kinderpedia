@@ -331,3 +331,62 @@ async def test_parse_checkin_time():
     assert KinderpediaCalendar._parse_checkin_time("unknown") is None
     assert KinderpediaCalendar._parse_checkin_time("") is None
     assert KinderpediaCalendar._parse_checkin_time("Not completed") is None
+
+
+# -------------------------------------------------------------------
+# Absence handling
+# -------------------------------------------------------------------
+
+async def test_absent_day_has_no_school_event(hass: HomeAssistant):
+    """When a child is absent, no School event should be created for that day."""
+    coordinator = MagicMock()
+    data = _make_coordinator_data()
+
+    # Mark Monday as absent (but keep meal data — the menu is still published)
+    data["children"]["111_222"]["days"]["monday"]["absent"] = True
+    data["children"]["111_222"]["days"]["monday"]["checkin"] = "Absent"
+    data["children"]["111_222"]["days"]["monday"]["absence_reason"] = "vacation"
+
+    coordinator.data = data
+    cal = _make_calendar(coordinator)
+    events = cal._build_events()
+
+    monday_events = [
+        e for e in events
+        if isinstance(e.start, datetime) and e.start.date() == date(2026, 2, 9)
+    ]
+    assert len(monday_events) == 0, "No events should be created for an absent day"
+
+
+async def test_absent_day_has_no_nap_event(hass: HomeAssistant):
+    """When a child is absent, no Nap event should be created either."""
+    coordinator = MagicMock()
+    data = _make_coordinator_data()
+
+    data["children"]["111_222"]["days"]["monday"]["absent"] = True
+    data["children"]["111_222"]["days"]["monday"]["checkin"] = "Absent"
+
+    coordinator.data = data
+    cal = _make_calendar(coordinator)
+    events = cal._build_events()
+
+    nap_events = [e for e in events if e.summary == "Nap"]
+    assert len(nap_events) == 0, "No nap event for an absent day"
+
+
+async def test_non_absent_day_still_has_school_event(hass: HomeAssistant):
+    """Days without the absent flag should still produce events normally."""
+    coordinator = MagicMock()
+    data = _make_coordinator_data()
+    # Ensure absent is not set
+    data["children"]["111_222"]["days"]["monday"].pop("absent", None)
+
+    coordinator.data = data
+    cal = _make_calendar(coordinator)
+    events = cal._build_events()
+
+    monday_school = [
+        e for e in events
+        if isinstance(e.start, datetime) and e.start.date() == date(2026, 2, 9) and e.summary == "School"
+    ]
+    assert len(monday_school) == 1
