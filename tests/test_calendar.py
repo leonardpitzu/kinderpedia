@@ -134,8 +134,12 @@ async def test_calendar_event_description_has_emoji_meals(hass: HomeAssistant):
 # .event property
 # -------------------------------------------------------------------
 
-async def test_calendar_event_property_returns_today(hass: HomeAssistant):
+async def test_calendar_event_property_returns_today(hass: HomeAssistant, freezer):
     """The .event property returns an event for today if one exists."""
+    # Freeze to a known Tuesday at 10:00 UTC so date.today() and
+    # dt_util.now().date() always agree regardless of CI timezone.
+    freezer.move_to("2026-03-31T10:00:00+00:00")
+
     coordinator = MagicMock()
     data = _make_coordinator_data()
 
