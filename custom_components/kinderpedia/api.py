@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.exceptions import HomeAssistantError
 from .const import LOGIN_URL, CORE_URL, DATA_URL, NEWSFEED_URL, API_KEY
@@ -22,10 +22,10 @@ class KinderpediaAPI:
         self.password = password
         self.session = async_get_clientsession(hass)
         self.token = None
-        self.token_expiry = datetime.min
+        self.token_expiry = datetime.min.replace(tzinfo=timezone.utc)
 
     async def login(self):
-        if self.token and datetime.now() < self.token_expiry:
+        if self.token and datetime.now(tz=timezone.utc) < self.token_expiry:
             _LOGGER.debug("Reusing cached token")
             return
 
@@ -50,7 +50,7 @@ class KinderpediaAPI:
         _LOGGER.debug("Login response: %s", data)
 
         self.token = data.get("token")
-        self.token_expiry = datetime.fromtimestamp(data.get("expire_at", 0))
+        self.token_expiry = datetime.fromtimestamp(data.get("expire_at", 0), tz=timezone.utc)
 
         if not self.token:
             raise KinderpediaAuthError("Login failed: missing token")

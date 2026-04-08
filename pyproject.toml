@@ -2,14 +2,14 @@
 name = "kinderpedia"
 version = "1.0.0"
 description = "Kinderpedia Home Assistant integration"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 
 [tool.ruff]
-target-version = "py312"
+target-version = "py314"
 line-length = 120
 
 [tool.ruff.lint]
