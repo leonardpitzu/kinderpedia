@@ -3,9 +3,16 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+# OS junk
+.DS_Store
+
 # Example API response files
 newsfeed
 dailytimeline
+
+# Media backup – downloaded media and local credentials
+media_backup/downloads/
+media_backup/config.json
 
 # C extensions
 *.so
