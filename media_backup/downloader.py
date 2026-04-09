@@ -8,7 +8,6 @@ import requests
 import piexif
 from pathlib import Path
 from datetime import datetime
-from urllib.parse import urlparse, parse_qs
 
 try:
     import yt_dlp
