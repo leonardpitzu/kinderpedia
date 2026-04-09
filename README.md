@@ -91,3 +91,51 @@ No parameters needed — it runs for all configured children.
 ## License
 
 This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+
+## Media backup (standalone)
+
+The `media_backup/` folder contains a standalone Python script that downloads all photos and videos from your Kinderpedia gallery, timestamps them with EXIF metadata, and organises them into album folders — ready to import into Apple Photos (or any other library).
+
+> **Note:** This tool is completely independent of the Home Assistant integration. HACS does not deploy it, and it has no effect on the HA setup.
+
+### Quick start
+
+```bash
+cd media_backup
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+cp config.json.template config.json   # then fill in your credentials
+python downloader.py
+```
+
+### Configuration
+
+Copy `config.json.template` to `config.json` and fill in your values:
+
+```json
+{
+    "email": "your_email@example.com",
+    "password": "your_password",
+    "child_id": "000000",
+    "kindergarten_id": "0000"
+}
+```
+
+`config.json` is gitignored and stays local. The template is tracked so you can recreate the config after a fresh clone.
+
+### What it does
+
+- Logs in to Kinderpedia and paginates through the full photo and video gallery.
+- Downloads images into per-album folders under `media_backup/downloads/`.
+- Embeds the original date into EXIF `DateTimeOriginal` and sets the file's mtime, so Apple Photos sorts them chronologically.
+- Writes album descriptions into each image's EXIF `ImageDescription` field.
+- Downloads Vimeo-hosted videos via `yt-dlp`.
+
+### Prerequisites
+
+[FFmpeg](https://ffmpeg.org/) must be installed and available on your `PATH` — `yt-dlp` needs it to merge video and audio streams from Vimeo.
+
+```bash
+# macOS
+brew install ffmpeg
+```
