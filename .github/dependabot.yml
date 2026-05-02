@@ -1,22 +1,21 @@
-# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates
 version: 2
 updates:
-  # Keep GitHub Actions up to date
-  - package-ecosystem: "github-actions"
-    directory: "/"
+  - package-ecosystem: github-actions
+    directory: /
     schedule:
-      interval: "weekly"
+      interval: weekly
+      day: monday
     open-pull-requests-limit: 5
     labels:
-      - "dependencies"
-      - "ci"
+      - dependencies
+      - automated
 
-  # Keep Python test dependencies up to date
-  - package-ecosystem: "pip"
-    directory: "/"
+  - package-ecosystem: pip
+    directory: /
     schedule:
-      interval: "weekly"
+      interval: weekly
+      day: monday
     open-pull-requests-limit: 5
     labels:
-      - "dependencies"
-      - "python"
+      - dependencies
+      - automated
