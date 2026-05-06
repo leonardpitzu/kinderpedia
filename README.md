@@ -36,7 +36,7 @@ The calendar entity also exposes **detailed attributes** for the most recent sch
 
 1. Open HACS in your Home Assistant instance.
 2. Go to **Integrations** → **⋮** → **Custom repositories**.
-3. Add `https://github.com/leonardpitzu/kinderpedia` as an **Integration**.
+3. Add `https://github.com/leonardpitzu/homeassistant_kinderpedia` as an **Integration**.
 4. Search for **Kinderpedia** and install it.
 5. Restart Home Assistant.
 

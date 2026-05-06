@@ -8,7 +8,7 @@
   "dependencies": [],
   "documentation": "https://mykp.kinderpedia.co/",
   "iot_class": "cloud_polling",
-  "issue_tracker": "https://github.com/leonardpitzu/kinderpedia/issues",
+  "issue_tracker": "https://github.com/leonardpitzu/homeassistant_kinderpedia/issues",
   "requirements": [],
   "version": "1.0.0"
 }
